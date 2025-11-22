@@ -185,7 +185,7 @@ const UploadSection = ({ onUploadComplete }) => {
                                         {isUploading ? "Processing Your File" : "Drop your file here"}
                                     </h3>
                                     <p className="text-muted-foreground">
-                                        {isUploading ? "Analyzing and indexing content..." : "or click to browse • PDF, DOCX, TXT"}
+                                        {isUploading ? "Analyzing and indexing content..." : "or click to browse • PDF"}
                                     </p>
                                 </div>
 
