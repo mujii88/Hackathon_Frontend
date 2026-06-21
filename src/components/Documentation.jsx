@@ -1,251 +1,151 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { X, Upload, MessageSquare, Link2, FileText, Zap, CheckCircle } from 'lucide-react';
-import { Button } from './ui/Button';
+import React, { useState } from 'react';
+import { Code2, Copy, Check, Info } from 'lucide-react';
+import { Card } from './ui/Card';
 
-const Documentation = ({ isOpen, onClose }) => {
-    if (!isOpen) return null;
+const Documentation = () => {
+    const [activeLang, setActiveLang] = useState('javascript');
+    const [copied, setCopied] = useState(false);
+
+    const codeSnippets = {
+        javascript: `// Interrogate knowledge base using Fetch API
+async function askQuestion(namespaceId, query) {
+  const response = await fetch(
+    \`http://127.0.0.1:8000/chat/\${namespaceId}\`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ query: query })
+    }
+  );
+  
+  const data = await response.json();
+  console.log("AI Answer:", data.formatted_answer);
+  return data;
+}`,
+        python: `# Interrogate knowledge base using Python Requests
+import requests
+
+def ask_question(namespace_id, query):
+    url = f"http://127.0.0.1:8000/chat/{namespace_id}"
+    payload = {"query": query}
+    headers = {"Content-Type": "application/json"}
+    
+    response = requests.post(url, json=payload, headers=headers)
+    data = response.json()
+    
+    print("AI Answer:", data.get("formatted_answer"))
+    return data`,
+        curl: `# Interrogate knowledge base using cURL
+curl -X POST \\
+  http://127.0.0.1:8000/chat/YOUR_NAMESPACE_ID \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+    "query": "What is the summary of this document?"
+  }'`
+    };
+
+    const copyCode = () => {
+        navigator.clipboard.writeText(codeSnippets[activeLang]);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                className="bg-gradient-to-br from-background to-background/95 border border-primary/20 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden shadow-2xl"
-            >
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-border/50 bg-black/30">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                            <FileText className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                            <h2 className="text-2xl font-bold text-gradient">Documentation</h2>
-                            <p className="text-sm text-muted-foreground">How to use InstantRAG</p>
+        <div className="h-full flex flex-col p-8 overflow-y-auto custom-scrollbar bg-[#F8F9FA]">
+            {/* Header info */}
+            <div className="flex items-center gap-3 mb-8">
+                <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center border border-[#DADCE0] shadow-sm">
+                    <Code2 className="w-6 h-6 text-[#1A73E8]" />
+                </div>
+                <div>
+                    <h3 className="text-xl font-medium text-[#202124]">Developer API Integration</h3>
+                    <p className="text-sm text-[#5F6368]">Connect your applications to InstantRAG semantic capabilities.</p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                {/* Integration Details Left */}
+                <div className="lg:col-span-1 space-y-6">
+                    <div className="bg-white p-6 border border-[#DADCE0] rounded-2xl shadow-sm">
+                        <h4 className="text-sm font-medium text-[#202124] mb-3">Endpoint Details</h4>
+                        <p className="text-sm text-[#5F6368] leading-relaxed mb-5">
+                            You can easily integrate InstantRAG's semantic search bridges directly into your own frontend or application without building any backends.
+                        </p>
+                        
+                        <div className="space-y-3">
+                            <div className="p-3 bg-[#F8F9FA] border border-[#DADCE0] rounded-xl flex items-center gap-3">
+                                <span className="bg-[#E6F4EA] text-[#137333] px-2 py-0.5 rounded text-xs font-bold">POST</span>
+                                <span className="font-mono text-sm text-[#3C4043]">/chat/{"{namespace}"}</span>
+                            </div>
                         </div>
                     </div>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={onClose}
-                        className="text-muted-foreground hover:text-white"
-                    >
-                        <X className="w-5 h-5" />
-                    </Button>
+
+                    {/* Quick guidelines */}
+                    <div className="bg-white p-6 border border-[#DADCE0] text-sm text-[#5F6368] space-y-4 rounded-2xl shadow-sm">
+                        <div className="flex gap-3 items-start">
+                            <Info className="w-5 h-5 text-[#1A73E8] shrink-0 mt-0.5" />
+                            <p>All endpoints accept a JSON body containing a <code className="bg-[#F1F3F4] text-[#202124] px-1.5 py-0.5 rounded">query</code> string parameter.</p>
+                        </div>
+                        <div className="flex gap-3 items-start">
+                            <Info className="w-5 h-5 text-[#1A73E8] shrink-0 mt-0.5" />
+                            <p>Responses return parsed semantic text snippets retrieved from Pinecone alongside the Gemini response.</p>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Content */}
-                <div className="p-6 overflow-y-auto max-h-[calc(90vh-100px)] space-y-6">
-                    {/* Introduction */}
-                    <section>
-                        <h3 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-                            <Zap className="w-5 h-5 text-primary" />
-                            What is InstantRAG?
-                        </h3>
-                        <p className="text-muted-foreground leading-relaxed">
-                            InstantRAG is a powerful RAG (Retrieval-Augmented Generation) service that allows you to upload PDF documents
-                            and create an AI-powered chat interface to ask questions about your documents. Get instant, accurate answers
-                            based on your document content.
-                        </p>
-                    </section>
-
-                    {/* Step 1: Upload */}
-                    <section className="p-4 rounded-xl bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/10">
-                        <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">1</div>
-                            <Upload className="w-5 h-5 text-primary" />
-                            Upload Your PDF
-                        </h3>
-                        <div className="space-y-2 text-muted-foreground">
-                            <p><strong className="text-white">Location:</strong> Left section - "Upload PDF"</p>
-                            <p><strong className="text-white">How to upload:</strong></p>
-                            <ul className="list-disc list-inside ml-4 space-y-1">
-                                <li>Click the upload area or drag & drop your PDF file</li>
-                                <li>Wait for the upload progress bar to complete</li>
-                                <li>Once uploaded, you'll see your file details and a generated chat link</li>
-                            </ul>
-                            <div className="mt-3 p-3 rounded-lg bg-success/10 border border-success/20">
-                                <p className="text-success text-sm flex items-center gap-2">
-                                    <CheckCircle className="w-4 h-4" />
-                                    The link is automatically generated and ready to use!
-                                </p>
+                {/* Code editor previewer right */}
+                <div className="lg:col-span-2">
+                    <div className="border border-[#DADCE0] flex flex-col bg-white rounded-2xl shadow-sm overflow-hidden">
+                        {/* Tab selectors */}
+                        <div className="flex items-center justify-between px-2 bg-[#F8F9FA] border-b border-[#DADCE0]">
+                            <div className="flex">
+                                {['javascript', 'python', 'curl'].map((lang) => (
+                                    <button
+                                        key={lang}
+                                        onClick={() => {
+                                            setActiveLang(lang);
+                                            setCopied(false);
+                                        }}
+                                        className={`px-6 py-3.5 text-sm font-medium transition-all border-b-2 ${
+                                            activeLang === lang
+                                                ? 'border-[#1A73E8] text-[#1A73E8] bg-white'
+                                                : 'border-transparent text-[#5F6368] hover:bg-black/5 hover:text-[#202124]'
+                                        }`}
+                                    >
+                                        {lang === 'javascript' ? 'JavaScript' : lang === 'python' ? 'Python' : 'cURL'}
+                                    </button>
+                                ))}
                             </div>
+
+                            <button
+                                onClick={copyCode}
+                                className="mr-4 px-4 py-1.5 flex items-center gap-2 border border-[#DADCE0] hover:bg-[#F1F3F4] rounded-md text-[#5F6368] hover:text-[#202124] transition-colors text-sm font-medium"
+                            >
+                                {copied ? (
+                                    <>
+                                        <Check className="w-4 h-4 text-[#34A853]" />
+                                        <span className="text-[#34A853]">Copied</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Copy className="w-4 h-4" />
+                                        <span>Copy Code</span>
+                                    </>
+                                )}
+                            </button>
                         </div>
-                    </section>
 
-                    {/* Step 2: Copy Link */}
-                    <section className="p-4 rounded-xl bg-gradient-to-br from-accent/5 to-secondary/5 border border-accent/10">
-                        <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-sm font-bold">2</div>
-                            <Link2 className="w-5 h-5 text-accent" />
-                            Copy Your Chat Link
-                        </h3>
-                        <div className="space-y-2 text-muted-foreground">
-                            <p>After successful upload, you'll see:</p>
-                            <ul className="list-disc list-inside ml-4 space-y-1">
-                                <li><strong className="text-white">ID:</strong> A unique identifier for your document</li>
-                                <li><strong className="text-white">Generated Link:</strong> Your personal chat URL</li>
-                                <li>Click the "Copy Link" button to copy it to your clipboard</li>
-                            </ul>
-                            <p className="mt-2 text-sm">
-                                💡 <strong className="text-white">Tip:</strong> Share this link with others to let them chat with your document too!
-                            </p>
+                        {/* Code snippet display */}
+                        <div className="p-6 overflow-x-auto max-h-[400px] custom-scrollbar bg-white">
+                            <pre className="text-[13px] font-mono text-[#3C4043] leading-[1.6]">
+                                <code>{codeSnippets[activeLang]}</code>
+                            </pre>
                         </div>
-                    </section>
-
-                    {/* Step 3: Test Chat */}
-                    <section className="p-4 rounded-xl bg-gradient-to-br from-secondary/5 to-primary/5 border border-secondary/10">
-                        <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-secondary text-white flex items-center justify-center text-sm font-bold">3</div>
-                            <MessageSquare className="w-5 h-5 text-secondary" />
-                            Test Your Link
-                        </h3>
-                        <div className="space-y-2 text-muted-foreground">
-                            <p><strong className="text-white">Location:</strong> Right section - "Test Your Link"</p>
-                            <p><strong className="text-white">How to test:</strong></p>
-                            <ul className="list-disc list-inside ml-4 space-y-1">
-                                <li>Paste your generated link in the input field</li>
-                                <li>Click "Test Link" to activate the chat interface</li>
-                                <li>Type your questions about the document</li>
-                                <li>Press Enter or click Send to get AI-powered answers</li>
-                            </ul>
-                            <div className="mt-3 p-3 rounded-lg bg-primary/10 border border-primary/20">
-                                <p className="text-primary text-sm">
-                                    🤖 The AI will analyze your document and provide accurate, contextual answers!
-                                </p>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Features */}
-                    <section>
-                        <h3 className="text-xl font-semibold text-white mb-3">✨ Key Features</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                                <p className="text-white font-medium">📄 PDF Support</p>
-                                <p className="text-sm text-muted-foreground">Upload any PDF document</p>
-                            </div>
-                            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                                <p className="text-white font-medium">⚡ Instant Processing</p>
-                                <p className="text-sm text-muted-foreground">Fast document analysis</p>
-                            </div>
-                            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                                <p className="text-white font-medium">🔗 Shareable Links</p>
-                                <p className="text-sm text-muted-foreground">Share with anyone</p>
-                            </div>
-                            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-                                <p className="text-white font-medium">💬 AI Chat</p>
-                                <p className="text-sm text-muted-foreground">Ask questions naturally</p>
-                            </div>
-                        </div>
-                    </section>
-
-
-
-                    {/* Integration Guide */}
-                    <section className="p-4 rounded-xl bg-gradient-to-br from-accent/10 to-primary/10 border border-accent/20">
-                        <h3 className="text-lg font-semibold text-white mb-3">🚀 Use in Your Own Frontend (No Backend Needed!)</h3>
-                        <p className="text-muted-foreground mb-4">
-                            You can integrate the generated chat link into <strong className="text-white">any frontend application</strong> to create
-                            a personal chatbot without building your own backend! Just make HTTP requests to the chat endpoint.
-                        </p>
-
-                        <div className="space-y-4">
-                            {/* API Structure */}
-                            <div className="p-3 rounded-lg bg-black/30 border border-white/10">
-                                <p className="text-white font-semibold mb-2">📡 API Request Format:</p>
-                                <div className="space-y-2 text-sm font-mono">
-                                    <p className="text-muted-foreground">
-                                        <span className="text-accent">POST</span> https://backend-q71m.onrender.com/chat/<span className="text-primary">{'{id}'}</span>
-                                    </p>
-                                    <p className="text-muted-foreground mt-2">
-                                        <span className="text-white">Headers:</span> Content-Type: application/json
-                                    </p>
-                                    <p className="text-muted-foreground">
-                                        <span className="text-white">Body:</span> {`{ "question": "your question here" }`}
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* JavaScript Example */}
-                            <div className="p-3 rounded-lg bg-black/30 border border-white/10">
-                                <p className="text-white font-semibold mb-2">💻 Example (Vanilla JavaScript):</p>
-                                <pre className="text-xs text-muted-foreground overflow-x-auto">
-                                    {`async function chatWithDocument(id, question) {
-  const response = await fetch(
-    \`https://backend-q71m.onrender.com/chat/\${id}\`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question })
-    }
-  );
-  const data = await response.json();
-  return data.answer; // Returns AI response
-}`}
-                                </pre>
-                            </div>
-
-                            {/* React Example */}
-                            <div className="p-3 rounded-lg bg-black/30 border border-white/10">
-                                <p className="text-white font-semibold mb-2">⚛️ Example (React):</p>
-                                <pre className="text-xs text-muted-foreground overflow-x-auto">
-                                    {`const [answer, setAnswer] = useState('');
-
-const askQuestion = async () => {
-  const response = await fetch(
-    'https://backend-q71m.onrender.com/chat/YOUR_ID',
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: 'What is this about?' })
-    }
-  );
-  const data = await response.json();
-  setAnswer(data.answer);
-};`}
-                                </pre>
-                            </div>
-
-                            {/* Use Cases */}
-                            <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-                                <p className="text-primary font-semibold mb-2">✨ Use Cases:</p>
-                                <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-                                    <li>Add AI chat to your personal website</li>
-                                    <li>Create a custom documentation assistant</li>
-                                    <li>Build a mobile app with document Q&A</li>
-                                    <li>Integrate into Chrome extensions</li>
-                                    <li>No backend infrastructure needed!</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* Tips */}
-                    <section className="p-4 rounded-xl bg-gradient-to-r from-primary/10 via-accent/10 to-secondary/10 border border-primary/20">
-                        <h3 className="text-lg font-semibold text-white mb-3">💡 Pro Tips</h3>
-                        <ul className="space-y-2 text-muted-foreground">
-                            <li className="flex items-start gap-2">
-                                <span className="text-primary mt-1">•</span>
-                                <span>Ask specific questions for more accurate answers</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-accent mt-1">•</span>
-                                <span>The chat maintains context, so you can ask follow-up questions</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-secondary mt-1">•</span>
-                                <span>Use "New Upload" to process a different document</span>
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="text-primary mt-1">•</span>
-                                <span>The chat scrolls automatically to show the latest messages</span>
-                            </li>
-                        </ul>
-                    </section>
+                    </div>
                 </div>
-            </motion.div>
+            </div>
         </div>
     );
 };

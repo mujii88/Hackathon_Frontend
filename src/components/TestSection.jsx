@@ -1,75 +1,61 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Sparkles, MessageSquare, Send, Loader2, TestTube } from 'lucide-react';
+import { Send, Loader2, Check, Copy, Sparkles, BookOpen, Search, Code, Info } from 'lucide-react';
 import { Button } from './ui/Button';
-import { Card } from './ui/Card';
 import { Input } from './ui/Input';
+import { cn } from '../lib/utils';
+import { useToast } from '../context/ToastContext';
 
-const TestSection = () => {
-    const [link, setLink] = useState('');
+const TestSection = ({ activeDoc }) => {
+    const { showToast } = useToast();
     const [messages, setMessages] = useState([]);
     const [inputMessage, setInputMessage] = useState('');
-    const [isLinkValid, setIsLinkValid] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
     const [isSending, setIsSending] = useState(false);
+    const [selectedMsgId, setSelectedMsgId] = useState(null);
+    const [copiedIndex, setCopiedIndex] = useState(null);
     const messagesEndRef = useRef(null);
 
-    // Auto-scroll to bottom when messages change
+    // Auto-scroll to bottom
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    const handleTestLink = (e) => {
-        e.preventDefault();
-        if (!link.trim()) return;
-
-        // Validate link format
-        if (!link.includes('/chat/')) {
-            alert('Please enter a valid chat link');
-            return;
+    // Clear and reset chat when active document changes
+    useEffect(() => {
+        if (activeDoc) {
+            const initialMsg = {
+                id: 'init',
+                type: 'bot',
+                text: `I'm ready to answer questions about **${activeDoc.name}**.\n\nWhat would you like to know?`,
+                snippets: [],
+                latency: 0
+            };
+            setMessages([initialMsg]);
+            setSelectedMsgId('init');
         }
-
-        setIsLoading(true);
-
-        // Just validate the link format, no API call needed
-        setTimeout(() => {
-            setIsLoading(false);
-            setIsLinkValid(true);
-            setMessages([
-                {
-                    id: 1,
-                    type: 'bot',
-                    text: "Hello! I'm ready to answer questions about your document. What would you like to know?"
-                }
-            ]);
-        }, 800);
-    };
+    }, [activeDoc]);
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!inputMessage.trim() || isSending) return;
+        if (!inputMessage.trim() || isSending || !activeDoc) return;
 
+        const question = inputMessage;
+        const userMsgId = `user-${Date.now()}`;
         const userMessage = {
-            id: messages.length + 1,
+            id: userMsgId,
             type: 'user',
-            text: inputMessage
+            text: question,
+            snippets: []
         };
 
         setMessages(prev => [...prev, userMessage]);
-        const question = inputMessage;
         setInputMessage('');
         setIsSending(true);
 
+        const startTime = Date.now();
+
         try {
-            // Extract namespace from link
-            const namespace = link.split('/chat/')[1];
-
-            if (!namespace) {
-                throw new Error('Invalid link format');
-            }
-
-            // Make actual API call to backend
-            const response = await fetch(`https://backend-q71m.onrender.com/chat/${namespace}`, {
+            const response = await fetch(`/api/chat/${activeDoc.namespace}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -82,234 +68,242 @@ const TestSection = () => {
             }
 
             const data = await response.json();
+            const latencyTime = Date.now() - startTime;
+            const botMsgId = `bot-${Date.now()}`;
 
             const botMessage = {
-                id: messages.length + 2,
+                id: botMsgId,
                 type: 'bot',
-                text: data.formatted_answer || data.answer || 'I received your question but couldn\'t generate a response.'
+                text: data.formatted_answer || data.answer || 'Empty response received.',
+                snippets: data.context_snippets || [],
+                latency: latencyTime
             };
 
             setMessages(prev => [...prev, botMessage]);
+            setSelectedMsgId(botMsgId);
             setIsSending(false);
 
         } catch (error) {
             console.error('Chat error:', error);
-
+            const botMsgId = `bot-err-${Date.now()}`;
             const errorMessage = {
-                id: messages.length + 2,
+                id: botMsgId,
                 type: 'bot',
-                text: '❌ Failed to get response. Please make sure the link is valid and try again.'
+                text: 'Connection failed. Unable to retrieve context or generate an answer.',
+                snippets: [],
+                latency: 0
             };
 
             setMessages(prev => [...prev, errorMessage]);
+            setSelectedMsgId(botMsgId);
             setIsSending(false);
         }
     };
 
-    const resetTest = () => {
-        setIsLinkValid(false);
-        setMessages([]);
-        setLink('');
-        setInputMessage('');
+    const copyText = (text, index) => {
+        navigator.clipboard.writeText(text);
+        setCopiedIndex(index);
+        setTimeout(() => setCopiedIndex(null), 2000);
     };
 
+    const selectedMsg = messages.find(m => m.id === selectedMsgId) || null;
+    const activeSnippets = selectedMsg?.snippets || [];
+
     return (
-        <div className="h-full flex flex-col justify-center max-w-xl mx-auto w-full p-8 animate-slide-left">
-            <motion.div
-                initial={{ opacity: 0, x: 30 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.6, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                className="h-full flex flex-col"
-            >
-                {/* Header */}
-                <div className="mb-8">
-                    <div className="flex items-center gap-2 mb-3">
-                        <TestTube className="w-6 h-6 text-accent" />
-                        <h2 className="text-4xl font-heading font-bold text-gradient-animate">
-                            Test Your Link
-                        </h2>
-                    </div>
-                    <p className="text-muted-foreground text-lg">
-                        Preview how your users will interact with the intelligent chat.
-                    </p>
+        <div className="w-full h-full flex overflow-hidden bg-[#F8F9FA]">
+            {/* Left Column: Semantic Source Inspector */}
+            <div className="w-[350px] border-r border-[#DADCE0] flex flex-col h-full bg-white select-none shrink-0">
+                <div className="p-4 border-b border-[#DADCE0] bg-[#F8F9FA] flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-[#1A73E8]" />
+                    <span className="text-sm font-medium text-[#202124]">Sources</span>
                 </div>
 
-                <AnimatePresence mode="wait">
-                    {!isLinkValid ? (
-                        <motion.div
-                            key="input"
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                        >
-                            <Card className="p-8 border-border bg-gradient-to-br from-accent/5 to-secondary/5 backdrop-blur-xl relative overflow-hidden">
-                                {/* Animated Background */}
-                                <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-transparent to-secondary/10 opacity-50" />
-
-                                <form onSubmit={handleTestLink} className="space-y-6 relative z-10">
-                                    <div className="space-y-3">
-                                        <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                                            <MessageSquare className="w-4 h-4 text-accent" />
-                                            Chat Link
-                                        </label>
-                                        <Input
-                                            placeholder="https://instantrag.app/chat/..."
-                                            value={link}
-                                            onChange={(e) => setLink(e.target.value)}
-                                            className="bg-black/40 border-accent/20 focus:border-accent/50 h-14 text-base transition-all"
-                                        />
-                                    </div>
-
-                                    <Button
-                                        type="submit"
-                                        className="w-full h-14 bg-gradient-to-r from-accent to-secondary text-white hover:opacity-90 font-semibold text-base glow-accent transition-all"
-                                        disabled={isLoading || !link.trim()}
-                                    >
-                                        {isLoading ? (
-                                            <motion.div
-                                                className="flex items-center gap-2"
-                                                initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
-                                            >
-                                                <Loader2 className="w-5 h-5 animate-spin" />
-                                                Connecting...
-                                            </motion.div>
-                                        ) : (
-                                            <motion.div
-                                                className="flex items-center gap-2"
-                                                whileHover={{ scale: 1.02 }}
-                                            >
-                                                <Sparkles className="w-5 h-5" />
-                                                Test Link
-                                                <ArrowRight className="w-5 h-5" />
-                                            </motion.div>
-                                        )}
-                                    </Button>
-                                </form>
-                            </Card>
-                        </motion.div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar select-text bg-[#F8F9FA]">
+                    {activeSnippets.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-center p-6 select-none">
+                            <div className="w-12 h-12 bg-white rounded-full border border-[#DADCE0] flex items-center justify-center mb-3 shadow-sm">
+                                <Search className="w-5 h-5 text-[#9AA0A6]" />
+                            </div>
+                            <h4 className="text-sm font-medium text-[#3C4043]">No Sources Selected</h4>
+                            <p className="text-xs text-[#5F6368] mt-1 max-w-[200px]">
+                                Click on an AI response to see its retrieved context chunks.
+                            </p>
+                        </div>
                     ) : (
-                        <motion.div
-                            key="chat"
-                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{ type: "spring", duration: 0.7, bounce: 0.3 }}
-                            className="flex-1 flex flex-col"
-                        >
-                            <Card className="flex-1 flex flex-col border-accent/20 bg-gradient-to-br from-accent/5 to-secondary/5 backdrop-blur-xl overflow-hidden glow-accent">
-                                {/* Chat Header */}
-                                <div className="p-6 border-b border-accent/20 bg-black/20">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent/20 to-secondary/20 flex items-center justify-center border border-accent/30">
-                                                <Sparkles className="w-5 h-5 text-accent" />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-semibold text-white">AI Assistant</h3>
-                                                <p className="text-xs text-muted-foreground">Ready to help</p>
-                                            </div>
-                                        </div>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={resetTest}
-                                            className="text-muted-foreground hover:text-white hover:bg-white/5"
-                                        >
-                                            New Test
-                                        </Button>
-                                    </div>
-                                </div>
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between text-xs font-medium text-[#5F6368] mb-2 px-1">
+                                <span>Retrieved Chunks</span>
+                                <span className="bg-[#E8F0FE] text-[#1A73E8] px-2 py-0.5 rounded-full">{activeSnippets.length}</span>
+                            </div>
 
-                                {/* Messages */}
-                                <div className="max-h-96 p-6 overflow-y-auto space-y-4">
-                                    <AnimatePresence>
-                                        {messages.map((message, index) => (
-                                            <motion.div
-                                                key={message.id}
-                                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                                transition={{ delay: index * 0.1 }}
-                                                className={`flex gap-3 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                            {activeSnippets.map((snippet, idx) => (
+                                <motion.div
+                                    key={snippet.id || idx}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: idx * 0.05 }}
+                                    className="p-4 bg-white border border-[#DADCE0] rounded-xl hover:shadow-md transition-all cursor-text group"
+                                >
+                                    {/* Snippet Header */}
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#1A73E8]">
+                                            <Code className="w-3.5 h-3.5" />
+                                            <span>Chunk {idx + 1}</span>
+                                        </div>
+                                        <div className="text-[10px] text-[#5F6368] bg-[#F1F3F4] px-1.5 py-0.5 rounded">
+                                            Score: 0.89
+                                        </div>
+                                    </div>
+
+                                    {/* Snippet Text Content */}
+                                    <p className="text-xs text-[#3C4043] leading-relaxed">
+                                        {snippet.text}
+                                    </p>
+                                </motion.div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Right Column: AI Chat Console */}
+            <div className="flex-1 flex flex-col h-full bg-white relative">
+                
+                {/* Top Info Bar */}
+                {activeDoc && (
+                    <div className="px-6 py-4 border-b border-[#DADCE0] bg-white flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className="text-[#5F6368]">Chatting with</span>
+                            <span className="font-medium text-[#202124]">{activeDoc.name}</span>
+                        </div>
+                        <button
+                            onClick={() => {
+                                navigator.clipboard.writeText(`http://127.0.0.1:8000/chat/${activeDoc.namespace}`);
+                                showToast('API Link copied to clipboard!', 'success');
+                            }}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium text-[#1A73E8] bg-[#E8F0FE] hover:bg-[#D2E3FC] transition-colors"
+                        >
+                            <Copy className="w-3.5 h-3.5" />
+                            Copy API Endpoint
+                        </button>
+                    </div>
+                )}
+
+                {/* Messages Feed */}
+                <div className="flex-1 p-6 overflow-y-auto space-y-6 custom-scrollbar select-text bg-white">
+                    {messages.map((msg, index) => {
+                        const isSelected = selectedMsgId === msg.id;
+                        return (
+                            <div
+                                key={msg.id}
+                                onClick={() => msg.snippets.length > 0 && setSelectedMsgId(msg.id)}
+                                className={cn(
+                                    "flex flex-col gap-1 max-w-[85%]",
+                                    msg.type === 'user' ? 'ml-auto items-end' : 'mr-auto items-start',
+                                    msg.snippets.length > 0 && "cursor-pointer"
+                                )}
+                            >
+                                {/* Chat Bubble */}
+                                <div
+                                    className={cn(
+                                        "px-5 py-3.5 text-[15px] leading-relaxed transition-all shadow-sm",
+                                        msg.type === 'user'
+                                            ? "bg-[#1A73E8] text-white rounded-[24px] rounded-tr-sm"
+                                            : msg.text.includes('Connection failed')
+                                                ? "bg-[#FCE8E6] border border-[#FAD2CF] text-[#C5221F] rounded-[24px] rounded-tl-sm"
+                                                : cn(
+                                                    "bg-[#F1F3F4] border border-transparent text-[#202124] rounded-[24px] rounded-tl-sm",
+                                                    isSelected && "border-[#1A73E8] bg-[#E8F0FE]"
+                                                  )
+                                    )}
+                                >
+                                    <div className="space-y-3">
+                                        {msg.text.split('\n').map((line, lineIdx) => (
+                                            <p key={lineIdx}>
+                                                {line.split('**').map((part, i) => 
+                                                    i % 2 === 1 ? <strong key={i} className="font-semibold">{part}</strong> : part
+                                                )}
+                                            </p>
+                                        ))}
+                                    </div>
+                                    
+                                    {/* Action Footers for Bot replies */}
+                                    {msg.type === 'bot' && msg.id !== 'init' && !msg.text.includes('Connection failed') && (
+                                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-black/5">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    copyText(msg.text, index);
+                                                }}
+                                                className="flex items-center gap-1.5 text-xs text-[#5F6368] hover:text-[#1A73E8] transition-colors font-medium"
                                             >
-                                                {message.type === 'bot' && (
-                                                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent/20 to-secondary/20 flex items-center justify-center shrink-0 border border-accent/30">
-                                                        <Sparkles className="w-4 h-4 text-accent" />
+                                                {copiedIndex === index ? (
+                                                    <>
+                                                        <Check className="w-3.5 h-3.5 text-[#34A853]" />
+                                                        <span className="text-[#34A853]">Copied</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Copy className="w-3.5 h-3.5" />
+                                                        <span>Copy</span>
+                                                    </>
+                                                )}
+                                            </button>
+
+                                            <div className="flex items-center gap-3 text-xs text-[#5F6368]">
+                                                {msg.snippets.length > 0 && (
+                                                    <div className="flex items-center gap-1">
+                                                        <BookOpen className="w-3.5 h-3.5" />
+                                                        <span>{msg.snippets.length} sources</span>
                                                     </div>
                                                 )}
-                                                <div
-                                                    className={`max-w-[75%] rounded-2xl p-4 ${message.type === 'user'
-                                                        ? 'bg-gradient-to-br from-primary to-accent text-white rounded-tr-sm'
-                                                        : 'bg-white/5 text-foreground rounded-tl-sm border border-white/10'
-                                                        }`}
-                                                >
-                                                    <p className="text-sm leading-relaxed">{message.text}</p>
-                                                </div>
-                                            </motion.div>
-                                        ))}
-                                    </AnimatePresence>
-
-                                    {/* Typing Indicator */}
-                                    {isSending && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className="flex gap-3"
-                                        >
-                                            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent/20 to-secondary/20 flex items-center justify-center shrink-0 border border-accent/30">
-                                                <Sparkles className="w-4 h-4 text-accent" />
+                                                {msg.latency > 0 && (
+                                                    <span className="text-[#9AA0A6]">{msg.latency}ms</span>
+                                                )}
                                             </div>
-                                            <div className="bg-white/5 rounded-2xl rounded-tl-sm p-4 border border-white/10">
-                                                <div className="flex gap-1">
-                                                    <motion.div
-                                                        className="w-2 h-2 bg-accent rounded-full"
-                                                        animate={{ opacity: [0.3, 1, 0.3] }}
-                                                        transition={{ duration: 1, repeat: Infinity, delay: 0 }}
-                                                    />
-                                                    <motion.div
-                                                        className="w-2 h-2 bg-accent rounded-full"
-                                                        animate={{ opacity: [0.3, 1, 0.3] }}
-                                                        transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
-                                                    />
-                                                    <motion.div
-                                                        className="w-2 h-2 bg-accent rounded-full"
-                                                        animate={{ opacity: [0.3, 1, 0.3] }}
-                                                        transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </motion.div>
+                                        </div>
                                     )}
-
-                                    {/* Scroll anchor */}
-                                    <div ref={messagesEndRef} />
                                 </div>
+                            </div>
+                        );
+                    })}
 
-                                {/* Input */}
-                                <div className="p-6 border-t border-accent/20 bg-black/20">
-                                    <form onSubmit={handleSendMessage} className="flex gap-3">
-                                        <Input
-                                            placeholder="Ask a question..."
-                                            value={inputMessage}
-                                            onChange={(e) => setInputMessage(e.target.value)}
-                                            className="flex-1 bg-black/40 border-accent/20 focus:border-accent/50 h-12"
-                                            disabled={isSending}
-                                        />
-                                        <Button
-                                            type="submit"
-                                            size="icon"
-                                            className="h-12 w-12 bg-gradient-to-r from-accent to-secondary hover:opacity-90 shrink-0"
-                                            disabled={isSending || !inputMessage.trim()}
-                                        >
-                                            <Send className="w-5 h-5" />
-                                        </Button>
-                                    </form>
-                                </div>
-                            </Card>
-                        </motion.div>
+                    {/* Chat Loading State */}
+                    {isSending && (
+                        <div className="flex items-start gap-3 max-w-[85%] mr-auto">
+                            <div className="bg-[#F1F3F4] px-5 py-4 rounded-[24px] rounded-tl-sm flex items-center gap-3 shadow-sm">
+                                <Sparkles className="w-5 h-5 text-[#1A73E8] animate-pulse" />
+                                <span className="text-[15px] text-[#5F6368] font-medium">Generating response...</span>
+                            </div>
+                        </div>
                     )}
-                </AnimatePresence>
-            </motion.div>
+
+                    <div ref={messagesEndRef} />
+                </div>
+
+                {/* Query Input Box */}
+                <div className="p-4 bg-white border-t border-[#DADCE0]">
+                    <form onSubmit={handleSendMessage} className="relative max-w-4xl mx-auto">
+                        <Input
+                            placeholder={activeDoc ? `Ask a question about ${activeDoc.name}...` : "Please select a document first"}
+                            value={inputMessage}
+                            onChange={(e) => setInputMessage(e.target.value)}
+                            disabled={isSending || !activeDoc}
+                            className="w-full pr-14 pl-6 h-14 bg-[#F1F3F4] border-transparent focus:border-[#1A73E8] focus:bg-white text-[15px] text-[#202124] rounded-full shadow-sm"
+                        />
+                        <button
+                            type="submit"
+                            className="absolute right-2 top-2 h-10 w-10 bg-[#1A73E8] text-white rounded-full flex items-center justify-center hover:bg-[#1557B0] hover:shadow-md transition-all disabled:opacity-50 disabled:hover:shadow-none"
+                            disabled={isSending || !inputMessage.trim() || !activeDoc}
+                        >
+                            <Send className="w-4 h-4 ml-0.5" />
+                        </button>
+                    </form>
+                    <div className="text-center mt-2">
+                        <p className="text-xs text-[#5F6368]">Gemini may produce inaccurate information about people, places, or facts.</p>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
